@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+:root {
+  --teal: #4d8ea2;
+  --teal-dark: #3a7085;
+  --teal-light: #e8f4f7;
+  --sand: #c8b49a;
+  --dark: #35382f;
+  --cream: #fffcf5;
+  --bg: #f2f6f8;
+  --border: #dde8ec;
+  --confirm: #2e9e6b;
+  --pending: #f0a500;
+  --cancel: #d94f4f;
+}
+
+@theme {
+  --font-sans: "Poppins", ui-sans-serif, system-ui, sans-serif;
+
+  --color-teal: #4d8ea2;
+  --color-teal-dark: #3a7085;
+  --color-teal-light: #e8f4f7;
+  --color-sand: #c8b49a;
+  --color-dark: #35382f;
+  --color-cream: #fffcf5;
+  --color-bg: #f2f6f8;
+  --color-border: #dde8ec;
+  --color-confirm: #2e9e6b;
+  --color-pending: #f0a500;
+  --color-cancel: #d94f4f;
+}
+
+body {
+  font-family: "Poppins", ui-sans-serif, system-ui, sans-serif;
+  background-color: var(--bg);
+  color: var(--dark);
+}
+
+.cd.cerrado {
+  background-color: #fdeaea;
+  color: #d94f4f;
+  cursor: not-allowed;
+  font-weight: 600;
+}
+.cd.cerrado:hover {
+  background-color: #fdeaea;
+}
+
+.cd.reducido {
+  background-color: #fff8e6;
+  color: #c47f00;
+  cursor: pointer;
+  font-weight: 600;
+}
