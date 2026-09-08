@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { CalendarDays, UserX, CalendarRange, XCircle } from 'lucide-react'
 import Card from '../components/ui/Card'
+import ErrorState from '../components/ui/ErrorState'
 import KPICard from '../components/secretaria/KPICard'
 import TurnosTable from '../components/secretaria/TurnosTable'
 import AsignacionModal from '../components/secretaria/AsignacionModal'
@@ -26,7 +27,7 @@ export default function SecretariaPage() {
   const [semanaCount, setSemanaCount] = useState(0)
 
   const hoy = todayStr()
-  const { turnos, loading, refetch } = useTurnos({
+  const { turnos, loading, error, refetch } = useTurnos({
     fecha: hoy,
     estado: filtro === 'todos' ? undefined : filtro,
   })
@@ -100,7 +101,14 @@ export default function SecretariaPage() {
           ))}
         </div>
 
-        <TurnosTable turnos={turnos} loading={loading} onAsignar={setTurnoParaAsignar} />
+        {error ? (
+          <ErrorState
+            mensaje="No pudimos cargar los turnos de hoy. Intentá de nuevo."
+            onRetry={refetch}
+          />
+        ) : (
+          <TurnosTable turnos={turnos} loading={loading} onAsignar={setTurnoParaAsignar} />
+        )}
       </Card>
 
       <AsignacionModal

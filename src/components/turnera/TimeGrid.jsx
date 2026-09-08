@@ -25,7 +25,7 @@ export default function TimeGrid({ slots, selected, onSelect, loading }) {
             <button
               key={slot}
               onClick={() => onSelect(slot)}
-              className={`rounded-xl border px-3 py-2 text-sm font-medium transition-colors cursor-pointer ${
+              className={`min-h-11 rounded-xl border px-3 py-2 text-sm font-medium transition-colors cursor-pointer ${
                 selected === slot
                   ? 'border-teal bg-teal text-cream'
                   : 'border-border bg-white text-dark hover:border-teal/50 hover:bg-teal-light'

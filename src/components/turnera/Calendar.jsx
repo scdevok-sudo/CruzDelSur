@@ -41,6 +41,7 @@ export default function Calendar({ selected, onSelect, profesionalId }) {
   const today = startOfDay(new Date())
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
   const [excepciones, setExcepciones] = useState([])
+  const [cargandoExc, setCargandoExc] = useState(true)
 
   const year = viewDate.getFullYear()
   const month = viewDate.getMonth()
@@ -52,6 +53,7 @@ export default function Calendar({ selected, onSelect, profesionalId }) {
   useEffect(() => {
     let cancelado = false
     async function fetchExcepciones() {
+      setCargandoExc(true)
       const primerDiaMes = toFechaStr(new Date(year, month, 1))
       const ultimoDiaMes = toFechaStr(new Date(year, month + 1, 0))
       const { data, error } = await supabase
@@ -60,7 +62,9 @@ export default function Calendar({ selected, onSelect, profesionalId }) {
         .gte('fecha', primerDiaMes)
         .lte('fecha', ultimoDiaMes)
       // la tabla puede no existir todavía si no se corrió la migración v2
-      if (!cancelado) setExcepciones(error ? [] : (data ?? []))
+      if (cancelado) return
+      setExcepciones(error ? [] : (data ?? []))
+      setCargandoExc(false)
     }
     fetchExcepciones()
     return () => {
@@ -87,7 +91,7 @@ export default function Calendar({ selected, onSelect, profesionalId }) {
       <div className="mb-4 flex items-center justify-between">
         <button
           onClick={() => setViewDate(new Date(year, month - 1, 1))}
-          className="rounded-lg p-1.5 text-dark/60 hover:bg-teal-light hover:text-teal cursor-pointer"
+          className="flex h-11 w-11 items-center justify-center rounded-lg text-dark/60 hover:bg-teal-light hover:text-teal cursor-pointer"
         >
           <ChevronLeft size={18} />
         </button>
@@ -96,7 +100,7 @@ export default function Calendar({ selected, onSelect, profesionalId }) {
         </p>
         <button
           onClick={() => setViewDate(new Date(year, month + 1, 1))}
-          className="rounded-lg p-1.5 text-dark/60 hover:bg-teal-light hover:text-teal cursor-pointer"
+          className="flex h-11 w-11 items-center justify-center rounded-lg text-dark/60 hover:bg-teal-light hover:text-teal cursor-pointer"
         >
           <ChevronRight size={18} />
         </button>
@@ -110,7 +114,11 @@ export default function Calendar({ selected, onSelect, profesionalId }) {
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-1">
+      <div
+        className={`grid grid-cols-7 gap-1 transition-opacity ${
+          cargandoExc ? 'pointer-events-none opacity-40' : ''
+        }`}
+      >
         {cells.map((date, i) => {
           if (!date) return <div key={i} />
           const fueraDeRango = isDisabled(date)
@@ -135,7 +143,7 @@ export default function Calendar({ selected, onSelect, profesionalId }) {
               disabled={disabled}
               onClick={() => !cerrado && onSelect(date)}
               title={title}
-              className={`cd aspect-square rounded-lg text-sm font-medium transition-colors ${
+              className={`cd aspect-square min-h-10 rounded-lg text-sm font-medium transition-colors ${
                 cerrado
                   ? 'cerrado cursor-not-allowed font-semibold'
                   : reducido

@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "seed:hoy": "node scripts/seed-turnos-hoy.mjs"
+    "seed:hoy": "node scripts/seed-turnos-hoy.mjs",
+    "seed:prod": "node --env-file=.env.production scripts/seed-produccion.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.3",

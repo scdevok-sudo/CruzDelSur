@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CalendarCheck, ChevronLeft, ChevronRight, Wallet } from 'lucide-react'
+import { CalendarCheck, ChevronLeft, ChevronRight, MessageCircle, Wallet } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
+import Spinner from '../components/ui/Spinner'
+import ErrorState from '../components/ui/ErrorState'
 import StepWizard from '../components/turnera/StepWizard'
 import EspecialidadGrid from '../components/turnera/EspecialidadGrid'
 import ProfCard from '../components/turnera/ProfCard'
@@ -13,6 +15,8 @@ import { useProfesionales } from '../hooks/useProfesionales'
 import { useSlotsDisponibles } from '../hooks/useDisponibilidad'
 import { useTurnos, crearTurno } from '../hooks/useTurnos'
 import { getProximosTurnosDisponibles } from '../lib/slots'
+import { esPacienteValido } from '../lib/validaciones'
+import { buildWaLink } from '../lib/whatsapp'
 
 const todayStr = () => {
   const d = new Date()
@@ -51,12 +55,25 @@ export default function TurneraPage() {
   const [proximosTurnos, setProximosTurnos] = useState([])
   const [loadingProximos, setLoadingProximos] = useState(false)
 
-  const { especialidades, loading: loadingEsp, error: errorEsp } = useEspecialidades()
-  const { profesionales, loading: loadingProf, error: errorProf } = useProfesionales({
-    especialidadId: especialidad?.id,
-  })
+  const {
+    especialidades,
+    loading: loadingEsp,
+    error: errorEsp,
+    refetch: refetchEsp,
+  } = useEspecialidades()
+  const {
+    profesionales,
+    loading: loadingProf,
+    error: errorProf,
+    refetch: refetchProf,
+  } = useProfesionales({ especialidadId: especialidad?.id })
   const { turnos: turnosHoy } = useTurnos({ fecha: todayStr() })
-  const { slots, loading: loadingSlots } = useSlotsDisponibles(profesional?.id, fecha)
+  const {
+    slots,
+    loading: loadingSlots,
+    error: errorSlots,
+    refetch: refetchSlots,
+  } = useSlotsDisponibles(profesional?.id, fecha)
 
   useEffect(() => {
     if (!profesional?.id) {
@@ -88,11 +105,7 @@ export default function TurneraPage() {
     2: !!profesional,
     3: !!fecha,
     4: !!hora,
-    5:
-      paciente.nombre.trim() &&
-      paciente.apellido.trim() &&
-      paciente.dni.trim() &&
-      paciente.telefono.trim(),
+    5: esPacienteValido(paciente),
   }[step]
 
   const irSiguiente = async () => {
@@ -114,8 +127,10 @@ export default function TurneraPage() {
       })
       setTurnoCreado(turno)
       setStep(6)
-    } catch (err) {
-      setErrorMsg(err.message ?? 'No se pudo guardar el turno. Intentá de nuevo.')
+    } catch {
+      setErrorMsg(
+        'No pudimos guardar tu turno. Revisá tu conexión e intentá de nuevo, o escribinos al consultorio.',
+      )
     } finally {
       setSubmitting(false)
     }
@@ -147,6 +162,13 @@ export default function TurneraPage() {
     setErrorMsg(null)
   }
 
+  // Fallback manual mientras el bot de WhatsApp no esté conectado.
+  // En producción (con el bot activo) el paciente recibe el mensaje automático.
+  const waLink =
+    import.meta.env.VITE_APP_ENV !== 'production' && turnoCreado
+      ? buildWaLink(`Hola! Hice una reserva en la turnera online. Código: ${turnoCreado.token}`)
+      : null
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
       <div className="mb-6 text-center">
@@ -161,11 +183,12 @@ export default function TurneraPage() {
           <div>
             <h2 className="mb-4 text-lg font-semibold text-dark">Elegí una especialidad</h2>
             {loadingEsp ? (
-              <p className="text-sm text-dark/50">Cargando especialidades...</p>
+              <Spinner label="Cargando especialidades..." />
             ) : errorEsp ? (
-              <p className="text-sm text-cancel">
-                No se pudieron cargar las especialidades: {errorEsp.message}
-              </p>
+              <ErrorState
+                mensaje="No pudimos cargar las especialidades. Intentá de nuevo o escribinos al consultorio."
+                onRetry={refetchEsp}
+              />
             ) : (
               <EspecialidadGrid
                 especialidades={especialidades}
@@ -180,13 +203,16 @@ export default function TurneraPage() {
           <div>
             <h2 className="mb-4 text-lg font-semibold text-dark">Elegí una profesional</h2>
             {loadingProf ? (
-              <p className="text-sm text-dark/50">Cargando profesionales...</p>
+              <Spinner label="Cargando profesionales..." />
             ) : errorProf ? (
-              <p className="text-sm text-cancel">
-                No se pudieron cargar las profesionales: {errorProf.message}
-              </p>
+              <ErrorState
+                mensaje="No pudimos cargar las profesionales. Intentá de nuevo o escribinos al consultorio."
+                onRetry={refetchProf}
+              />
             ) : profesionales.length === 0 ? (
-              <p className="text-sm text-dark/50">No hay profesionales disponibles.</p>
+              <p className="py-8 text-center text-sm text-dark/50">
+                No hay profesionales disponibles para esta especialidad.
+              </p>
             ) : (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {profesionales.map((p) => (
@@ -207,6 +233,8 @@ export default function TurneraPage() {
           <div>
             <h2 className="mb-4 text-lg font-semibold text-dark">Elegí una fecha</h2>
 
+            {loadingProximos && <Spinner label="Buscando los turnos más próximos..." />}
+
             {!loadingProximos && proximosTurnos.length > 0 && (
               <div className="mb-5">
                 <p className="mb-2 text-sm font-semibold text-dark/60">
@@ -217,7 +245,7 @@ export default function TurneraPage() {
                     <button
                       key={`${fechaToStr(f)}-${h}`}
                       onClick={() => elegirProximoTurno({ fecha: f, hora: h })}
-                      className="cursor-pointer rounded-lg border border-border px-3 py-2 text-sm font-medium transition-all hover:border-teal hover:bg-teal-light"
+                      className="min-h-11 cursor-pointer rounded-lg border border-border px-3 text-sm font-medium transition-all hover:border-teal hover:bg-teal-light"
                     >
                       {formatFecha(f)} · {h}
                     </button>
@@ -239,7 +267,14 @@ export default function TurneraPage() {
         {step === 4 && (
           <div>
             <h2 className="mb-4 text-lg font-semibold text-dark">Elegí un horario</h2>
-            <TimeGrid slots={slots} selected={hora} onSelect={setHora} loading={loadingSlots} />
+            {errorSlots ? (
+              <ErrorState
+                mensaje="No pudimos cargar los horarios de este día. Intentá de nuevo."
+                onRetry={refetchSlots}
+              />
+            ) : (
+              <TimeGrid slots={slots} selected={hora} onSelect={setHora} loading={loadingSlots} />
+            )}
           </div>
         )}
 
@@ -278,22 +313,43 @@ export default function TurneraPage() {
             <div className="mx-auto mt-6 max-w-sm space-y-2 rounded-xl bg-bg p-4 text-left text-sm">
               <Resumen label="Especialidad" value={especialidad?.nombre} />
               <Resumen label="Profesional" value={`${profesional.nombre} ${profesional.apellido}`} />
-              <Resumen label="Fecha" value={fecha.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })} />
+              <Resumen
+                label="Fecha"
+                value={fecha.toLocaleDateString('es-AR', {
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'long',
+                })}
+              />
               <Resumen label="Horario" value={hora} />
               <Resumen label="Paciente" value={`${paciente.nombre} ${paciente.apellido}`} />
               <Resumen label="Código" value={turnoCreado.token} />
             </div>
 
-            <Button className="mt-6" onClick={reiniciar}>
-              Reservar otro turno
-            </Button>
+            {waLink && (
+              <a
+                href={waLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-medium text-teal underline underline-offset-2"
+              >
+                <MessageCircle size={16} />
+                Escribir al consultorio por WhatsApp
+              </a>
+            )}
+
+            <div>
+              <Button className="mt-6" onClick={reiniciar}>
+                Reservar otro turno
+              </Button>
+            </div>
           </div>
         )}
 
-        {errorMsg && <p className="mt-4 text-sm text-cancel">{errorMsg}</p>}
+        {errorMsg && <ErrorState className="mt-4" mensaje={errorMsg} />}
 
         {step < 6 && (
-          <div className="mt-8 flex items-center justify-between">
+          <div className="mt-8 flex items-center justify-between gap-3">
             <Button variant="ghost" onClick={irAtras} disabled={step === 1}>
               <ChevronLeft size={16} /> Atrás
             </Button>
@@ -310,9 +366,9 @@ export default function TurneraPage() {
 
 function Resumen({ label, value }) {
   return (
-    <div className="flex items-center justify-between">
-      <span className="text-dark/50">{label}</span>
-      <span className="font-medium text-dark">{value}</span>
+    <div className="flex items-center justify-between gap-3">
+      <span className="shrink-0 text-dark/50">{label}</span>
+      <span className="text-right font-medium text-dark">{value}</span>
     </div>
   )
 }

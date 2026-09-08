@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { CalendarPlus } from 'lucide-react'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
+import Spinner from '../components/ui/Spinner'
+import ErrorState from '../components/ui/ErrorState'
 import AgendaHoy from '../components/profesional/AgendaHoy'
 import VistaSemanal from '../components/profesional/VistaSemanal'
 import AgendarTurnoModal from '../components/profesional/AgendarTurnoModal'
@@ -30,11 +32,17 @@ export default function AgendaPage() {
   const [vista, setVista] = useState('hoy')
   const [profesionalId, setProfesionalId] = useState(() => localStorage.getItem(PROFESIONAL_ID_KEY) ?? '')
   const [turnosSemana, setTurnosSemana] = useState([])
+  const [errorSemana, setErrorSemana] = useState(null)
   const [loadingSemana, setLoadingSemana] = useState(false)
   const [modalAgendarOpen, setModalAgendarOpen] = useState(false)
 
   const { profesionales, loading: loadingProf } = useProfesionales()
-  const { turnos: turnosHoy, loading: loadingHoy, refetch: refetchHoy } = useTurnos({
+  const {
+    turnos: turnosHoy,
+    loading: loadingHoy,
+    error: errorHoy,
+    refetch: refetchHoy,
+  } = useTurnos({
     fecha: todayStr(),
     profesionalId: profesionalId || undefined,
   })
@@ -58,12 +66,13 @@ export default function AgendaPage() {
       setLoadingSemana(true)
       const fin = new Date(weekStart)
       fin.setDate(fin.getDate() + 6)
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('turnos')
         .select(TURNO_SELECT)
         .eq('profesional_id', profesionalId)
         .gte('fecha', weekStart.toISOString().slice(0, 10))
         .lte('fecha', fin.toISOString().slice(0, 10))
+      setErrorSemana(error ?? null)
       setTurnosSemana(data ?? [])
       setLoadingSemana(false)
     }
@@ -133,15 +142,20 @@ export default function AgendaPage() {
 
       <Card className="p-5 sm:p-6">
         {vista === 'hoy' ? (
-          <AgendaHoy turnos={turnosHoy} loading={loadingHoy} />
+          errorHoy ? (
+            <ErrorState
+              mensaje="No pudimos cargar tu agenda de hoy. Intentá de nuevo."
+              onRetry={refetchHoy}
+            />
+          ) : (
+            <AgendaHoy turnos={turnosHoy} loading={loadingHoy} />
+          )
+        ) : errorSemana ? (
+          <ErrorState mensaje="No pudimos cargar la semana. Intentá de nuevo." />
+        ) : loadingSemana ? (
+          <Spinner label="Cargando semana..." />
         ) : (
-          <>
-            {loadingSemana ? (
-              <p className="py-10 text-center text-sm text-dark/50">Cargando semana...</p>
-            ) : (
-              <VistaSemanal turnos={turnosSemana} weekStart={weekStart} />
-            )}
-          </>
+          <VistaSemanal turnos={turnosSemana} weekStart={weekStart} />
         )}
       </Card>
     </div>
